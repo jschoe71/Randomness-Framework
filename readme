@@ -1,0 +1,3 @@
+Randomness Framework is a collection of extra functional Random Number Generators based on java.nio.Channels API.
+
+The Randomness Framework represent RNG as a Channel, and provide equal functionality - ByteByffer reding, interruptible, asynchronous, non-blocking and e.t.c.
