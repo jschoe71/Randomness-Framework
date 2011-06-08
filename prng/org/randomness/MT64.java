@@ -1,5 +1,6 @@
 /*
  * Copyright 2005, Nick Galbreath -- nickg [at] modp [dot] com
+ * Adopted to randomness framework by Anton Kabysh. 
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -50,6 +51,12 @@ import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
+/**
+ * 
+ * @author Anton Kabysh (randomness framework adaptation)
+ * @author Nick Galbreath
+ * 
+ */
 final class MT64 extends PseudorandomnessEngine implements Engine.MT {
 	/**
 	 * 
@@ -212,6 +219,37 @@ final class MT64 extends PseudorandomnessEngine implements Engine.MT {
 	}
 
 	@Override
+	public final int read(byte[] bytes) {
+		int i = 0;
+		final int iEnd = bytes.length - 7;
+		while (i < iEnd) {
+
+			if (!isOpen()) // check interruption status
+				return i;
+
+			final long random = generate64();
+			bytes[i] = (byte) (random & 0xff);
+			bytes[i + 1] = (byte) ((random >> 8) & 0xff);
+			bytes[i + 2] = (byte) ((random >> 16) & 0xff);
+			bytes[i + 3] = (byte) ((random >> 24) & 0xff);
+			bytes[i + 4] = (byte) ((random >> 32) & 0xff);
+			bytes[i + 5] = (byte) ((random >> 40) & 0xff);
+			bytes[i + 6] = (byte) ((random >> 48) & 0xff);
+			bytes[i + 7] = (byte) ((random >> 56) & 0xff);
+
+			i += 8;
+		}
+
+		long random = generate64();
+		while (i < bytes.length) {
+			bytes[i++] = (byte) (random & 0xff);
+			random = random >> 8;
+		}
+
+		return bytes.length;
+	}
+
+	@Override
 	public final int read(ByteBuffer buffer) {
 		final int numBytes = buffer.remaining();
 
@@ -219,7 +257,7 @@ final class MT64 extends PseudorandomnessEngine implements Engine.MT {
 
 		for (; (numBytes - bytes) >= LONG_SIZE_BYTES;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return bytes; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -312,7 +350,7 @@ final class MT64 extends PseudorandomnessEngine implements Engine.MT {
 
 		for (int longs = 0; longs < numLongs;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return longs; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -427,7 +465,7 @@ final class MT64 extends PseudorandomnessEngine implements Engine.MT {
 		int doubles = 0;
 		for (; doubles < numDoubles;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return doubles; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -513,7 +551,7 @@ final class MT64 extends PseudorandomnessEngine implements Engine.MT {
 
 		for (; longs < numLongs;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return longs * (LONG_SIZE_BYTES / INT_SIZE_BYTES); // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -606,7 +644,7 @@ final class MT64 extends PseudorandomnessEngine implements Engine.MT {
 
 		for (; longs < numLongs;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return longs * (LONG_SIZE_BYTES / FLOAT_SIZE_BYTES); // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -837,7 +875,7 @@ final class MT64 extends PseudorandomnessEngine implements Engine.MT {
 	public final int hashCode() {
 		if (!isOpen())
 			return System.identityHashCode(this);
-		
+
 		int hash = 17;
 
 		hash = 37 * hash + Arrays.hashCode(mag01);
@@ -935,8 +973,6 @@ final class MT64 extends PseudorandomnessEngine implements Engine.MT {
 
 		public Shared() {
 			idx.set(_this.mti);
-			assert shared == true;
-
 		}
 
 		// ///////////////////////////////////////////////////////////
@@ -1029,23 +1065,50 @@ final class MT64 extends PseudorandomnessEngine implements Engine.MT {
 		// /////////////// PRNG GENERATE FUNCTIONS ///////////////////
 		// ///////////////////////////////////////////////////////////
 
-		@Override
-		public final int read(ByteBuffer buffer) {
+		private final void begin() {
 			if (!isOpen())
 				throw new NonReadableChannelException();
+
+			lock.lock();
+			_this.mti = acquireCounter();
+			nextInt = nextLong = true; // clear intermediate state
+		}
+
+		private final void end() {
+			releaseCounter(_this.mti); // restore counter to global state
+			lock.unlock();
+
+		}
+
+		@Override
+		public int read(byte[] bytes) {
+
+			int read = 0;
+
+			try {
+				begin();
+
+				read = _this.read(bytes);
+
+			} finally {
+				end();
+			}
+
+			return read;
+		}
+
+		@Override
+		public final int read(ByteBuffer buffer) {
 
 			final int numBytes = buffer.remaining();
 
 			try {
-				lock.lock();
-				_this.mti = acquireCounter();
-				nextInt = nextLong = true; // clear intermediate state
+				begin();
 
 				_this.read(buffer);
 
-				releaseCounter(_this.mti); // restore counter to global state
 			} finally {
-				lock.unlock();
+				end();
 			}
 
 			return numBytes - buffer.remaining() /* should be zero */;
@@ -1053,21 +1116,16 @@ final class MT64 extends PseudorandomnessEngine implements Engine.MT {
 
 		@Override
 		public final int read(IntBuffer intBuffer) {
-			if (!isOpen())
-				throw new NonReadableChannelException();
 
 			final int numBytes = intBuffer.remaining();
 
 			try {
-				lock.lock();
-				_this.mti = acquireCounter();
-				nextInt = nextLong = true; // clear intermediate state
+				begin();
 
 				_this.read(intBuffer);
 
-				releaseCounter(_this.mti); // restore counter to global state
 			} finally {
-				lock.unlock();
+				end();
 			}
 
 			return numBytes - intBuffer.remaining() /* should be zero */;
@@ -1075,22 +1133,16 @@ final class MT64 extends PseudorandomnessEngine implements Engine.MT {
 
 		@Override
 		public final int read(FloatBuffer floatBuffer) {
-			if (!isOpen())
-				throw new NonReadableChannelException();
 
 			final int numBytes = floatBuffer.remaining();
 
 			try {
-				lock.lock();
-
-				_this.mti = acquireCounter();
-				nextInt = nextLong = true; // clear intermediate state
+				begin();
 
 				_this.read(floatBuffer);
 
-				releaseCounter(_this.mti); // restore counter to global state
 			} finally {
-				lock.unlock();
+				end();
 			}
 
 			return numBytes - floatBuffer.remaining() /* should be zero */;
@@ -1098,21 +1150,16 @@ final class MT64 extends PseudorandomnessEngine implements Engine.MT {
 
 		@Override
 		public final int read(LongBuffer longBuffer) {
-			if (!isOpen())
-				throw new NonReadableChannelException();
 
 			final int numBytes = longBuffer.remaining();
 
 			try {
-				lock.lock();
-				_this.mti = acquireCounter();
-				nextInt = nextLong = true; // clear intermediate state
+				begin();
 
 				_this.read(longBuffer);
 
-				releaseCounter(_this.mti); // restore counter to global state
 			} finally {
-				lock.unlock();
+				end();
 			}
 
 			return numBytes - longBuffer.remaining() /* should be zero */;
@@ -1120,21 +1167,16 @@ final class MT64 extends PseudorandomnessEngine implements Engine.MT {
 
 		@Override
 		public final int read(DoubleBuffer doubleBuffer) {
-			if (!isOpen())
-				throw new NonReadableChannelException();
 
 			final int numBytes = doubleBuffer.remaining();
 
 			try {
-				lock.lock();
-				_this.mti = acquireCounter();
-				nextInt = nextLong = true; // clear intermediate state
+				begin();
 
 				_this.read(doubleBuffer);
 
-				releaseCounter(_this.mti); // restore counter to global state
 			} finally {
-				lock.unlock();
+				end();
 			}
 
 			return numBytes - doubleBuffer.remaining() /* should be zero */;

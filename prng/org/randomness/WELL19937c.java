@@ -1,3 +1,21 @@
+/*
+ * Adopted to randomness framework by Anton Kabysh.
+ * 
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.randomness;
 
 import java.nio.ByteBuffer;
@@ -7,6 +25,7 @@ import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.util.Arrays;
 
+//The implementation is inspired from Apache Math's Well19937a
 final class WELL19937c extends WELLBase {
 
 	/**
@@ -66,6 +85,32 @@ final class WELL19937c extends WELLBase {
 	}
 
 	@Override
+	public final int read(byte[] bytes) {
+		int i = 0;
+		final int iEnd = bytes.length - 3;
+		while (i < iEnd) {
+
+			if (!isOpen()) // check interruption status
+				return i;
+
+			final int random = generate32();
+			bytes[i] = (byte) (random & 0xff);
+			bytes[i + 1] = (byte) ((random >> 8) & 0xff);
+			bytes[i + 2] = (byte) ((random >> 16) & 0xff);
+			bytes[i + 3] = (byte) ((random >> 24) & 0xff);
+			i += 4;
+		}
+
+		int random = generate32();
+		while (i < bytes.length) {
+			bytes[i++] = (byte) (random & 0xff);
+			random = random >> 8;
+		}
+
+		return bytes.length;
+	}
+
+	@Override
 	public final int read(ByteBuffer buffer) {
 		final int numBytes = buffer.remaining();
 
@@ -73,7 +118,7 @@ final class WELL19937c extends WELLBase {
 
 		for (; (numBytes - bytes) >= INT_SIZE_BYTES;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return bytes; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -127,7 +172,7 @@ final class WELL19937c extends WELLBase {
 
 		for (; ints < numInts;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return ints; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -173,7 +218,7 @@ final class WELL19937c extends WELLBase {
 
 		for (; floats < numFloats;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return floats; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -217,7 +262,7 @@ final class WELL19937c extends WELLBase {
 
 		for (int longs = 0; longs < numLongs;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return longs; // interrupt
 
 			int l;
@@ -298,7 +343,7 @@ final class WELL19937c extends WELLBase {
 
 		for (; doubles < numDoubles;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return doubles; // interrupt
 
 			int l;
@@ -591,7 +636,7 @@ final class WELL19937c extends WELLBase {
 	public final int hashCode() {
 		if (!isOpen())
 			return System.identityHashCode(this);
-		
+
 		int hash = 17;
 
 		hash = 37 * hash + M1;
@@ -635,7 +680,7 @@ final class WELL19937c extends WELLBase {
 
 		return this.index == that.index && this.hashCode() == that.hashCode();
 	}
-	
+
 	@Override
 	public final String toString() {
 		return PRNG.WELL19937c.name();

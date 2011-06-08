@@ -3,7 +3,6 @@ package org.randomness;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-import org.apache.commons.math.util.FastMath;
 
 abstract class PseudorandomnessEngine extends Pseudorandomness {
 
@@ -11,11 +10,6 @@ abstract class PseudorandomnessEngine extends Pseudorandomness {
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
-
-	/**
-	 * Indicate if generator is shared or not.
-	 */
-	final boolean shared;
 
 	/**
 	 * Length of seed in bytes
@@ -31,7 +25,6 @@ abstract class PseudorandomnessEngine extends Pseudorandomness {
 
 	public PseudorandomnessEngine() {
 		this.seedlen = PRNG.valueOf(toString()).seedlen();
-		shared = true;
 	}
 
 	@Override
@@ -99,6 +92,9 @@ abstract class PseudorandomnessEngine extends Pseudorandomness {
 	public int tryRead(ByteBuffer buffer) {
 		return this.read(buffer);
 	}
+	
+	
+	
 
 	
 }

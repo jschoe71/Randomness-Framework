@@ -78,6 +78,37 @@ final class CombinedRNG extends PseudorandomnessEngine {
 	}
 
 	@Override
+	public final int read(byte[] bytes) {
+		int i = 0;
+		final int iEnd = bytes.length - 7;
+		while (i < iEnd) {
+
+			if (!isOpen()) // check interruption status
+				return i;
+
+			final long random = generate64();
+			bytes[i] = (byte) (random & 0xff);
+			bytes[i + 1] = (byte) ((random >> 8) & 0xff);
+			bytes[i + 2] = (byte) ((random >> 16) & 0xff);
+			bytes[i + 3] = (byte) ((random >> 24) & 0xff);
+			bytes[i + 4] = (byte) ((random >> 32) & 0xff);
+			bytes[i + 5] = (byte) ((random >> 40) & 0xff);
+			bytes[i + 6] = (byte) ((random >> 48) & 0xff);
+			bytes[i + 7] = (byte) ((random >> 56) & 0xff);
+
+			i += 8;
+		}
+
+		long random = generate64();
+		while (i < bytes.length) {
+			bytes[i++] = (byte) (random & 0xff);
+			random = random >> 8;
+		}
+
+		return bytes.length;
+	}
+
+	@Override
 	public final int read(ByteBuffer buffer) {
 		final int numBytes = buffer.remaining();
 
@@ -85,7 +116,7 @@ final class CombinedRNG extends PseudorandomnessEngine {
 
 		for (; (numBytes - bytes) >= LONG_SIZE_BYTES;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return bytes; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -124,7 +155,7 @@ final class CombinedRNG extends PseudorandomnessEngine {
 
 		for (; longs < numLongs;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return longs * (LONG_SIZE_BYTES / INT_SIZE_BYTES); // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -162,7 +193,7 @@ final class CombinedRNG extends PseudorandomnessEngine {
 
 		for (; longs < numLongs;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return longs * (LONG_SIZE_BYTES / INT_SIZE_BYTES); // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -198,7 +229,7 @@ final class CombinedRNG extends PseudorandomnessEngine {
 
 		for (int longs = 0; longs < numLongs;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return longs; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -227,7 +258,7 @@ final class CombinedRNG extends PseudorandomnessEngine {
 
 		for (; doubles < numDoubles;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return doubles; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////

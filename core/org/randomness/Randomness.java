@@ -380,7 +380,7 @@ ReadableByteChannel, ScatteringByteChannel {
 	 * @throws NullPointerException
 	 *             if array is <code>null</code>.
 	 */
-	public final int read(byte[] bytes) {
+	public int read(byte[] bytes) {
 		return read(ByteBuffer.wrap(bytes));
 	}
 

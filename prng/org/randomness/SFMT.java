@@ -12,6 +12,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 final class SFMT extends PseudorandomnessEngine implements Engine.SFMT,
 		Pseudorandomness.Multiperiodical {
+
 	// Magic Numbers from original C version.
 	// ////////////////////////////////////////////////////////////
 
@@ -263,17 +264,74 @@ final class SFMT extends PseudorandomnessEngine implements Engine.SFMT,
 	}
 
 	@Override
+	public final int read(byte[] bytes) {
+		int i = 0;
+		final int iEnd = bytes.length - 3;
+
+		while (i < iEnd) {
+
+			if (!isOpen()) // check interruption status
+				return i;
+
+			if (idx == 0 && ((iEnd - i) >= N * INT_SIZE_BYTES)) {
+				int y;
+				for (; idx < sfmt.length;) {
+
+					y = sfmt[idx++];
+
+					bytes[i] = (byte) (y & 0xff);
+					bytes[i + 1] = (byte) ((y >> 8) & 0xff);
+					bytes[i + 2] = (byte) ((y >> 16) & 0xff);
+					bytes[i + 3] = (byte) ((y >> 24) & 0xff);
+					i += 4;
+				}
+
+				{
+					final int[] sfmt = this.sfmt;
+					int ik = 0, r1 = 4 * (N - 2), r2 = 4 * (N - 1);
+					for (; ik < 4 * (N - POS1); ik += 4) {
+						doRecursion(sfmt, ik, sfmt, ik, sfmt, ik + 4 * POS1,
+								sfmt, r1, sfmt, r2);
+						r1 = r2;
+						r2 = ik;
+					}
+					for (; ik < 4 * N; ik += 4) {
+						doRecursion(sfmt, ik, sfmt, ik, sfmt, ik + 4
+								* (POS1 - N), sfmt, r1, sfmt, r2);
+						r1 = r2;
+						r2 = ik;
+					}
+					idx = 0;
+				}
+
+			}
+
+			final int random = generate32();
+			bytes[i] = (byte) (random & 0xff);
+			bytes[i + 1] = (byte) ((random >> 8) & 0xff);
+			bytes[i + 2] = (byte) ((random >> 16) & 0xff);
+			bytes[i + 3] = (byte) ((random >> 24) & 0xff);
+			i += 4;
+		}
+
+		int random = generate32();
+		while (i < bytes.length) {
+			bytes[i++] = (byte) (random & 0xff);
+			random = random >> 8;
+		}
+
+		return bytes.length;
+	}
+
+	@Override
 	public final int read(ByteBuffer buffer) {
 		final int numBytes = buffer.remaining();
-
-		if (shared)
-			return read1(buffer);
 
 		int bytes = 0;
 
 		for (; (numBytes - bytes) >= INT_SIZE_BYTES;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return bytes; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -322,34 +380,6 @@ final class SFMT extends PseudorandomnessEngine implements Engine.SFMT,
 		return numBytes - buffer.remaining() /* should be zero */;
 	}
 
-	private final int read1(ByteBuffer buffer) {
-
-		final IntBuffer intBuffer = buffer.slice().asIntBuffer();
-		final int numBytes = buffer.remaining();
-
-		this.read1(intBuffer); // PHASE 1, 2;
-
-		// PHASE 3. SYNCHRONIZE STATES BETWEEN BUFFERS
-		int bytes = intBuffer.position() * INT_SIZE_BYTES;
-		buffer.position(buffer.position() + bytes);
-
-		// PHASE 4. PUT LAST BYTES
-		if (bytes < numBytes) {
-			// put last bytes
-			int rnd;
-			if (idx >= N32) {
-				rnd = generate32();
-			} else {
-				rnd = sfmt[idx++];
-			}
-
-			for (int n = numBytes - bytes; n-- > 0; bytes++)
-				buffer.put((byte) (rnd >>> (Byte.SIZE * n)));
-		}
-
-		return numBytes - buffer.remaining() /* should be zero */;
-	}
-
 	@Override
 	public final int read(IntBuffer intBuffer) {
 
@@ -357,12 +387,9 @@ final class SFMT extends PseudorandomnessEngine implements Engine.SFMT,
 
 		int ints = 0;
 
-		if (!shared)
-			return read1(intBuffer);
-
 		main_loop: for (; ints < numInts;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return ints; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -403,71 +430,6 @@ final class SFMT extends PseudorandomnessEngine implements Engine.SFMT,
 		return numInts - intBuffer.remaining() /* should be zero */;
 	}
 
-	private final int read1(IntBuffer intBuffer) {
-
-		final int numInts = intBuffer.remaining();
-
-		// PHASE 0. SFMT ZERO STATE
-		if (idx > 0 || idx < N32) {
-			intBuffer.put(this.sfmt, idx, N32 - idx);
-			idx = N32; // mark zero state.
-		}
-
-		final int iterations = intBuffer.remaining() / N32; // number of N32
-															// blocks
-
-		// PHASE 1. BULK GENERATION
-		if (iterations > 0) {
-
-			for (int itr = 0; itr < iterations; itr++) {
-
-				int i = 0, r1 = 4 * (N - 2), r2 = 4 * (N - 1);
-				for (; i < 4 * (N - POS1); i += 4) {
-					doRecursion(sfmt, i, sfmt, i, sfmt, i + 4 * POS1, sfmt, r1,
-							sfmt, r2);
-					r1 = r2;
-					r2 = i;
-				}
-				for (; i < 4 * N; i += 4) {
-					doRecursion(sfmt, i, sfmt, i, sfmt, i + 4 * (POS1 - N),
-							sfmt, r1, sfmt, r2);
-					r1 = r2;
-					r2 = i;
-				}
-				idx = 0;
-
-				intBuffer.put(sfmt);
-			}
-			idx = N32;
-		}
-
-		// PHASE 2. HALF-BULK GENERATION
-		if (idx >= N32) { // // GENERATE FUNCTION /////////////////////////
-
-			int i = 0, r1 = 4 * (N - 2), r2 = 4 * (N - 1);
-			for (; i < 4 * (N - POS1); i += 4) {
-				doRecursion(sfmt, i, sfmt, i, sfmt, i + 4 * POS1, sfmt, r1,
-						sfmt, r2);
-				r1 = r2;
-				r2 = i;
-			}
-			for (; i < 4 * N; i += 4) {
-				doRecursion(sfmt, i, sfmt, i, sfmt, i + 4 * (POS1 - N), sfmt,
-						r1, sfmt, r2);
-				r1 = r2;
-				r2 = i;
-			}
-
-			int remaining = intBuffer.remaining(); // less than N32
-
-			intBuffer.put(this.sfmt, 0, remaining);
-
-			idx = remaining;
-		}// //////////////// GENERATE FUNCTION ///////////////////////////
-
-		return numInts - intBuffer.remaining() /* should be zero */;
-	}
-
 	@Override
 	public int read(FloatBuffer floatBuffer) {
 
@@ -477,7 +439,7 @@ final class SFMT extends PseudorandomnessEngine implements Engine.SFMT,
 
 		main_loop: for (; floats < numFloats;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return floats; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -532,7 +494,7 @@ final class SFMT extends PseudorandomnessEngine implements Engine.SFMT,
 
 		for (int longs = 0; longs < numLongs;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return longs; // interrupt
 
 			int l;
@@ -647,7 +609,7 @@ final class SFMT extends PseudorandomnessEngine implements Engine.SFMT,
 
 		for (; doubles < numDoubles;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return doubles; // interrupt
 
 			int l;
@@ -1204,7 +1166,6 @@ final class SFMT extends PseudorandomnessEngine implements Engine.SFMT,
 
 		public Shared() {
 			idx.set(_this.idx);
-			assert shared == true;
 		}
 
 		@Override
@@ -1285,6 +1246,28 @@ final class SFMT extends PseudorandomnessEngine implements Engine.SFMT,
 		// ///////////////////////////////////////////////////////////
 		// /////////////// PRNG GENERATE FUNCTIONS ///////////////////
 		// ///////////////////////////////////////////////////////////
+
+		@Override
+		public final int read(byte[] bytes) {
+			if (!isOpen())
+				throw new NonReadableChannelException();
+
+			int read = 0;
+
+			try {
+				lock.lock();
+				_this.idx = acquireCounter();
+				nextInt = nextLong = true; // clear intermediate state
+
+				read = _this.read(bytes);
+
+				releaseCounter(_this.idx); // restore counter to global state
+			} finally {
+				lock.unlock();
+			}
+
+			return read;
+		}
 
 		@Override
 		public final int read(ByteBuffer buffer) {

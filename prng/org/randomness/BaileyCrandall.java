@@ -1,3 +1,38 @@
+/*
+ * Copyright 2005, Nick Galbreath -- nickg [at] modp [dot] com
+ * All rights reserved.
+ * Original source code adopted to Randomness Framework by Anton Kabysh.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *   Redistributions of source code must retain the above copyright
+ *   notice, this list of conditions and the following disclaimer.
+ *
+ *   Redistributions in binary form must reproduce the above copyright
+ *   notice, this list of conditions and the following disclaimer in the
+ *   documentation and/or other materials provided with the distribution.
+ *
+ *   Neither the name of the modp.com nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * This is the standard "new" BSD license:
+ * http://www.opensource.org/licenses/bsd-license.php
+ */
 package org.randomness;
 
 import java.nio.ByteBuffer;
@@ -229,6 +264,33 @@ final class BaileyCrandall extends PseudorandomnessEngine {
 	}
 
 	@Override
+	public final int read(byte[] bytes) {
+		int i = 0;
+		final int iEnd = bytes.length - 3;
+		while (i < iEnd) {
+
+			if (!isOpen()) // check interruption status
+				return i;
+
+			final int random = (int) (Double
+					.doubleToRawLongBits(generateFloatingPoint()) & 0x000fffffffffffffL);
+			bytes[i] = (byte) (random & 0xff);
+			bytes[i + 1] = (byte) ((random >> 8) & 0xff);
+			bytes[i + 2] = (byte) ((random >> 16) & 0xff);
+			bytes[i + 3] = (byte) ((random >> 24) & 0xff);
+			i += 4;
+		}
+
+		int random = (int) (Double.doubleToRawLongBits(generateFloatingPoint()) & 0x000fffffffffffffL);
+		while (i < bytes.length) {
+			bytes[i++] = (byte) (random & 0xff);
+			random = random >> 8;
+		}
+
+		return bytes.length;
+	}
+
+	@Override
 	public final int read(ByteBuffer buffer) {
 
 		final int numBytes = buffer.remaining();
@@ -237,7 +299,7 @@ final class BaileyCrandall extends PseudorandomnessEngine {
 
 		for (; (numBytes - bytes) >= INT_SIZE_BYTES;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return bytes; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -283,7 +345,7 @@ final class BaileyCrandall extends PseudorandomnessEngine {
 
 		for (int ints = 0; ints < numInts;) {
 
-			if (shared && !isOpen()) {// check interruption status
+			if (!isOpen()) {// check interruption status
 				return ints; // interrupt
 			}
 
@@ -319,7 +381,7 @@ final class BaileyCrandall extends PseudorandomnessEngine {
 
 		for (; floats < numFloats;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return floats; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -349,7 +411,7 @@ final class BaileyCrandall extends PseudorandomnessEngine {
 
 		for (int longs = 0; longs < numLongs;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return longs; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -397,7 +459,7 @@ final class BaileyCrandall extends PseudorandomnessEngine {
 
 		for (; doubles < numDoubles;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return doubles; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////

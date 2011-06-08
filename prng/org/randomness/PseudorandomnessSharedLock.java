@@ -25,7 +25,6 @@ final class PseudorandomnessSharedLock extends Pseudorandomness {
 		this.engine = engine;
 		this.lock = new ReentrantLock();
 		precision64 = (engine.minlen() == LONG_SIZE_BYTES);
-		assert engine.shared == true;
 	}
 
 	// ///////////////////////////////////////////////////////////

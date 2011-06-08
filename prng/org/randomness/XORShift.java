@@ -1,3 +1,19 @@
+// ============================================================================
+//   Copyright 2006-2009 Daniel W. Dyer
+//   Original source code adopted to Randomness Framework by Anton Kabysh.
+//
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+//
+//       http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+// ============================================================================
 package org.randomness;
 
 import java.nio.ByteBuffer;
@@ -5,7 +21,6 @@ import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
-import java.nio.channels.NonReadableChannelException;
 
 /**
  * Very fast pseudo random number generator. See <a href=
@@ -13,7 +28,7 @@ import java.nio.channels.NonReadableChannelException;
  * >this page</a> for a description. This RNG has a period of about 2^160, which
  * is not as long as the {@link MT} but it is faster.
  * 
- * @author Anton Kabysh
+ * @author Anton Kabysh (randomness framework adaptation)
  * @author Daniel Dyer (uncommons-math XORShiftRNG)
  * @author George Marsaglia
  */
@@ -54,6 +69,32 @@ final class XORShift extends PseudorandomnessEngine {
 	}
 
 	@Override
+	public final int read(byte[] bytes) {
+		int i = 0;
+		final int iEnd = bytes.length - 3;
+		while (i < iEnd) {
+
+			if (!isOpen()) // check interruption status
+				return i;
+
+			final int random = generate32();
+			bytes[i] = (byte) (random & 0xff);
+			bytes[i + 1] = (byte) ((random >> 8) & 0xff);
+			bytes[i + 2] = (byte) ((random >> 16) & 0xff);
+			bytes[i + 3] = (byte) ((random >> 24) & 0xff);
+			i += 4;
+		}
+
+		int random = generate32();
+		while (i < bytes.length) {
+			bytes[i++] = (byte) (random & 0xff);
+			random = random >> 8;
+		}
+
+		return bytes.length;
+	}
+
+	@Override
 	public final int read(ByteBuffer buffer) {
 		final int numBytes = buffer.remaining();
 
@@ -61,7 +102,7 @@ final class XORShift extends PseudorandomnessEngine {
 
 		for (; (numBytes - bytes) >= INT_SIZE_BYTES;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return bytes; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -99,7 +140,7 @@ final class XORShift extends PseudorandomnessEngine {
 
 		for (; ints < numInts;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return ints; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -127,7 +168,7 @@ final class XORShift extends PseudorandomnessEngine {
 
 		for (; floats < numFloats;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return floats; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -153,7 +194,7 @@ final class XORShift extends PseudorandomnessEngine {
 
 		for (int longs = 0; longs < numLongs;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return longs; // interrupt
 
 			int l;
@@ -198,7 +239,7 @@ final class XORShift extends PseudorandomnessEngine {
 
 		for (; doubles < numDoubles; doubles++) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return doubles; // interrupt
 
 			int l;

@@ -1,6 +1,7 @@
 /*
  * Copyright 2005, Nick Galbreath -- nickg [at] modp [dot] com
  * All rights reserved.
+ * Original source code adopted to Randomness Framework by Anton Kabysh.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -32,7 +33,6 @@
  * This is the standard "new" BSD license:
  * http://www.opensource.org/licenses/bsd-license.php
  */
-
 package org.randomness;
 
 import java.nio.ByteBuffer;
@@ -131,6 +131,32 @@ final class CellularAutomatonRule30 extends PseudorandomnessEngine {
 	}
 
 	@Override
+	public final int read(byte[] bytes) {
+		int i = 0;
+		final int iEnd = bytes.length - 3;
+		while (i < iEnd) {
+
+			if (!isOpen()) // check interruption status
+				return i;
+
+			final int random = generate32();
+			bytes[i] = (byte) (random & 0xff);
+			bytes[i + 1] = (byte) ((random >> 8) & 0xff);
+			bytes[i + 2] = (byte) ((random >> 16) & 0xff);
+			bytes[i + 3] = (byte) ((random >> 24) & 0xff);
+			i += 4;
+		}
+
+		int random = generate32();
+		while (i < bytes.length) {
+			bytes[i++] = (byte) (random & 0xff);
+			random = random >> 8;
+		}
+
+		return bytes.length;
+	}
+
+	@Override
 	public final int read(ByteBuffer buffer) {
 		final int numBytes = buffer.remaining();
 
@@ -138,7 +164,7 @@ final class CellularAutomatonRule30 extends PseudorandomnessEngine {
 
 		for (; (numBytes - bytes) >= INT_SIZE_BYTES;) {
 
-			if (shared && !isOpen()) {// check interruption status
+			if (!isOpen()) {// check interruption status
 				return bytes; // interrupt
 			}
 
@@ -181,7 +207,7 @@ final class CellularAutomatonRule30 extends PseudorandomnessEngine {
 
 		for (; ints < numInts;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return ints; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -214,7 +240,7 @@ final class CellularAutomatonRule30 extends PseudorandomnessEngine {
 
 		for (; floats < numFloats;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return floats; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -246,7 +272,7 @@ final class CellularAutomatonRule30 extends PseudorandomnessEngine {
 
 		for (int longs = 0; longs < numLongs;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return longs; // interrupt
 
 			int l;
@@ -299,7 +325,7 @@ final class CellularAutomatonRule30 extends PseudorandomnessEngine {
 
 		for (; doubles < numDoubles;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return doubles; // interrupt
 
 			int l;

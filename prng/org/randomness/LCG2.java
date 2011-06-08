@@ -64,6 +64,28 @@ final class LCG2 extends PseudorandomnessEngine implements Engine.LCG64 {
 	}
 
 	@Override
+	public final int read(byte[] bytes) {
+		int i = 0;
+		final int iEnd = bytes.length - 3;
+		while (i < iEnd) {
+			final int random = generate32();
+			bytes[i] = (byte) (random & 0xff);
+			bytes[i + 1] = (byte) ((random >> 8) & 0xff);
+			bytes[i + 2] = (byte) ((random >> 16) & 0xff);
+			bytes[i + 3] = (byte) ((random >> 24) & 0xff);
+			i += 4;
+		}
+
+		int random = generate32();
+		while (i < bytes.length) {
+			bytes[i++] = (byte) (random & 0xff);
+			random = random >> 8;
+		}
+
+		return bytes.length;
+	}
+
+	@Override
 	public final int read(ByteBuffer buffer) {
 		final int numBytes = buffer.remaining();
 
@@ -302,6 +324,51 @@ final class LCG2 extends PseudorandomnessEngine implements Engine.LCG64 {
 			// return lcg;
 			// }
 			// }
+		}
+
+		@Override
+		public final int read(byte[] bytes) {
+			if (!isOpen())
+				throw new NonReadableChannelException();
+
+			try {
+				lock.lock();
+				nextInt = nextLong = true; // clear intermediate state
+				long oldseed = acquireSeed(), nextseed = 0;
+
+				int i = 0;
+				final int iEnd = bytes.length - 3;
+
+				while (i < iEnd) {
+
+					if (!isOpen()) // check interruption status
+						return i;
+
+					nextseed = (oldseed * multiplier + addend) & mask;
+					oldseed = nextseed;
+					final int random = (int) (nextseed >>> 16);
+					bytes[i] = (byte) (random & 0xff);
+					bytes[i + 1] = (byte) ((random >> 8) & 0xff);
+					bytes[i + 2] = (byte) ((random >> 16) & 0xff);
+					bytes[i + 3] = (byte) ((random >> 24) & 0xff);
+					i += 4;
+				}
+
+				nextseed = (oldseed * multiplier + addend) & mask;
+				oldseed = nextseed;
+				int random = (int) (nextseed >>> 16);
+
+				while (i < bytes.length) {
+					bytes[i++] = (byte) (random & 0xff);
+					random = random >> 8;
+				}
+
+				seed.set(nextseed);
+			} finally {
+				lock.unlock();
+			}
+
+			return bytes.length;
 		}
 
 		@Override

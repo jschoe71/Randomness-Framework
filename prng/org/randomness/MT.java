@@ -198,6 +198,70 @@ final class MT extends PseudorandomnessEngine implements Engine.MT {
 	}
 
 	@Override
+	public final int read(byte[] bytes) {
+		int i = 0;
+		final int iEnd = bytes.length - 3;
+
+		while (i < iEnd) {
+
+			if (!isOpen()) // check interruption status
+				return i;
+
+			if (mti == 0 && ((iEnd - i) >= N * INT_SIZE_BYTES)) {
+				int y;
+				for (; mti < mt.length;) {
+
+					y = mt[mti++];
+					y ^= y >>> 11; // TEMPERING_SHIFT_U(y)
+					y ^= (y << 7) & TEMPERING_MASK_B; // TEMPERING_SHIFT_S(y)
+					y ^= (y << 15) & TEMPERING_MASK_C; // TEMPERING_SHIFT_T(y)
+					y ^= (y >>> 18); // TEMPERING_SHIFT_L(y)
+
+					bytes[i] = (byte) (y & 0xff);
+					bytes[i + 1] = (byte) ((y >> 8) & 0xff);
+					bytes[i + 2] = (byte) ((y >> 16) & 0xff);
+					bytes[i + 3] = (byte) ((y >> 24) & 0xff);
+					i += 4;
+				}
+
+				int kk;
+				final int[] mt = this.mt; // locals are slightly faster
+				final int[] mag01 = this.mag01; // locals are slightly faster
+
+				for (kk = 0; kk < N - M; kk++) {
+					y = (mt[kk] & UPPER_MASK) | (mt[kk + 1] & LOWER_MASK);
+					mt[kk] = mt[kk + M] ^ (y >>> 1) ^ mag01[y & 0x1];
+				}
+
+				for (; kk < N - 1; kk++) {
+					y = (mt[kk] & UPPER_MASK) | (mt[kk + 1] & LOWER_MASK);
+					mt[kk] = mt[kk + (M - N)] ^ (y >>> 1) ^ mag01[y & 0x1];
+				}
+
+				y = (mt[N - 1] & UPPER_MASK) | (mt[0] & LOWER_MASK);
+				mt[N - 1] = mt[M - 1] ^ (y >>> 1) ^ mag01[y & 0x1];
+
+				mti = 0;
+			}
+
+			final int random = generate32();
+			bytes[i] = (byte) (random & 0xff);
+			bytes[i + 1] = (byte) ((random >> 8) & 0xff);
+			bytes[i + 2] = (byte) ((random >> 16) & 0xff);
+			bytes[i + 3] = (byte) ((random >> 24) & 0xff);
+			i += 4;
+		}
+
+		int random = generate32();
+		while (i < bytes.length) {
+			bytes[i++] = (byte) (random & 0xff);
+			random = random >> 8;
+		}
+
+		return bytes.length;
+	}
+
+	@Override
 	public final int read(ByteBuffer buffer) {
 		final int numBytes = buffer.remaining();
 
@@ -205,7 +269,7 @@ final class MT extends PseudorandomnessEngine implements Engine.MT {
 
 		for (; (numBytes - bytes) >= INT_SIZE_BYTES;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return bytes; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -310,7 +374,7 @@ final class MT extends PseudorandomnessEngine implements Engine.MT {
 
 		for (; ints < numInts;) {
 
-			if (shared && !isOpen())
+			if (!isOpen())
 				return ints; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -426,7 +490,7 @@ final class MT extends PseudorandomnessEngine implements Engine.MT {
 
 		for (; floats < numFloats;) {
 
-			if (shared && !isOpen())
+			if (!isOpen())
 				return floats; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -516,7 +580,7 @@ final class MT extends PseudorandomnessEngine implements Engine.MT {
 
 		for (int longs = 0; longs < numLongs;) {
 
-			if (shared && !isOpen()) // check interruption status
+			if (!isOpen()) // check interruption status
 				return longs; // interrupt
 			// ///////////////// GENERATE FUNCTION /////////////////////
 			int l;
@@ -673,7 +737,7 @@ final class MT extends PseudorandomnessEngine implements Engine.MT {
 
 		for (; doubles < numDoubles;) {
 
-			if (shared && !isOpen())
+			if (!isOpen())
 				return doubles; // interrupt
 
 			// ///////////////// GENERATE FUNCTION /////////////////////
@@ -1319,7 +1383,7 @@ final class MT extends PseudorandomnessEngine implements Engine.MT {
 	public final int hashCode() {
 		if (!isOpen())
 			return System.identityHashCode(this);
-		
+
 		int hash = 17;
 
 		hash = 37 * hash + Arrays.hashCode(mag01);
@@ -1411,7 +1475,6 @@ final class MT extends PseudorandomnessEngine implements Engine.MT {
 		public Shared() {
 			_this = MT.this;
 			idx.set(_this.mti);
-			assert shared == true;
 		}
 
 		@Override
@@ -1504,6 +1567,27 @@ final class MT extends PseudorandomnessEngine implements Engine.MT {
 		// ///////////////////////////////////////////////////////////
 		// /////////////// PRNG GENERATE FUNCTIONS ///////////////////
 		// ///////////////////////////////////////////////////////////
+
+		public int read(byte[] bytes) {
+			if (!isOpen())
+				throw new NonReadableChannelException();
+
+			int read = 0;
+
+			try {
+				lock.lock();
+				_this.mti = acquireCounter();
+				nextInt = nextLong = true; // clear intermediate state
+
+				read = _this.read(bytes);
+
+				releaseCounter(_this.mti); // restore counter to global state
+			} finally {
+				lock.unlock();
+			}
+
+			return read;
+		};
 
 		@Override
 		public final int read(ByteBuffer buffer) {

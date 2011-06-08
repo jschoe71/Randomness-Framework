@@ -1,7 +1,6 @@
 package org.randomness;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 
 abstract class WELLBase extends PseudorandomnessEngine implements
 		Pseudorandomness.Multiperiodical {
@@ -107,8 +106,6 @@ abstract class WELLBase extends PseudorandomnessEngine implements
 		index = 0;
 		// //////////////// INSTANTIATE FUNCTION ////////////////////////
 	}
-
-	
 
 	@Override
 	public final int minlen() {
