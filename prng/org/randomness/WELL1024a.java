@@ -26,7 +26,7 @@ import java.nio.LongBuffer;
 import java.util.Arrays;
 
 // The implementation is inspired from Apache Math's Well1024a
-final class WELL1024a extends WELLBase {
+public final class WELL1024a extends WELLBase {
 	/** Serializable version identifier. */
 	private static final long serialVersionUID = 5680173464174485492L;
 
@@ -42,7 +42,7 @@ final class WELL1024a extends WELLBase {
 	/** Third parameter of the algorithm. */
 	private static final int M3 = 10;
 
-	WELL1024a() {
+	public WELL1024a() {
 		super(K, M1, M2, M3);
 		this.reset();
 	}
