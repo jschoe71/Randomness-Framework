@@ -192,7 +192,7 @@ import java.util.RandomAccess;
  *      Wikipedia - List of random number generators</a>
  */
 public abstract class Pseudorandomness extends Randomness implements
-		Serializable {
+		Serializable, Cloneable {
 	/**
 	 * 
 	 */
@@ -507,19 +507,19 @@ public abstract class Pseudorandomness extends Randomness implements
 	 * Returns a deep copy of this pseudorandomness with identical producing
 	 * output <i>(optional operation)</i>.
 	 * <p>
-	 * This metod <b>shoud be</b> overriden in subclasses, or
-	 * {@link UnsupportedOperationException} will be thrown. The returned copy
-	 * and original PRNG <b>should be</b> consistent at {@link #equals(Object)}
-	 * (be equal) and {@link #hashCode()} (has the same hash code) methods.
+	 * This method <b>should be</b> overridden in subclasses, or
+	 * {@link CloneNotSupportedException} will be thrown. The returned copy and
+	 * original PRNG <b>should be</b> consistent at {@link #equals(Object)} (be
+	 * equal) and {@link #hashCode()} (has the same hash code) methods.
 	 * <p>
-	 * This metod is overriden and implemented in all {@link PRNG} boundled
+	 * This method is overridden and implemented in all {@link PRNG} bundled
 	 * implementations.
 	 * 
 	 * @return the deep copy of this <code>Pseudorandomness</code>
 	 *         {@linkplain #equals(Object) equal} to original
 	 * 
-	 * @throws UnsupportedOperationException
-	 *             if not overriden
+	 * @throws CloneNotSupportedException
+	 *             if not overridden
 	 * 
 	 * @throws NonReadableChannelException
 	 *             if channel is closed (no state to copy)
@@ -530,6 +530,40 @@ public abstract class Pseudorandomness extends Randomness implements
 
 		throw new UnsupportedOperationException();
 	};
+
+	/**
+	 * Returns a deep {@linkplain #copy() copy} of this pseudorandomness with
+	 * identical producing output.
+	 * <p>
+	 * 
+	 * This just refer to {@link #copy()} method which <b>should be</b>
+	 * overridden in subclasses, or {@link CloneNotSupportedException} will be
+	 * thrown.
+	 * <p>
+	 * The returned copy and original PRNG has the same behavior as specified in
+	 * {@link #copy()} method.
+	 * <p>
+	 * This method is overridden and implemented in all {@link PRNG} bundled
+	 * implementations.
+	 * 
+	 * @return the deep copy of this <code>Pseudorandomness</code>
+	 *         {@linkplain #equals(Object) equal} to original
+	 * 
+	 * @throws CloneNotSupportedException
+	 *             if {@link #copy()} is not overridden
+	 * 
+	 * @throws NonReadableChannelException
+	 *             if channel is closed (no state to copy)
+	 */
+	@Override
+	protected final Pseudorandomness clone() throws CloneNotSupportedException {
+		try {
+			return this.copy();
+		} catch (UnsupportedOperationException ue) {
+			throw new CloneNotSupportedException(
+					"The method copy is not overridden.");
+		}
+	}
 
 	/**
 	 * Tells whether or not this PRNG is open to generate pseudorandom bytes.
@@ -1039,23 +1073,123 @@ public abstract class Pseudorandomness extends Randomness implements
 		int period();
 	}
 
-	public long nextLong1() {
-		// inspired by org.apache.commons.math.random.BitsStreamGenerator;
-		final long high = ((long) nextInt()) << 32;
-		final long low = ((long) nextInt()) & 0xffffffffL;
-		return high | low;
+	// long nextLong1() {
+	// // inspired by org.apache.commons.math.random.BitsStreamGenerator;
+	// final long high = ((long) nextInt()) << 32;
+	// final long low = ((long) nextInt()) & 0xffffffffL;
+	// return high | low;
+	// }
+	//
+	// float nextFloat1() {
+	// // inspired by org.apache.commons.math.random.BitsStreamGenerator;
+	// return (nextInt() >>> 8) * 0x1.0p-23f;
+	// }
+	//
+	// double nextDouble1() {
+	// // inspired by org.apache.commons.math.random.BitsStreamGenerator;
+	// final long high = ((long) (nextInt() >>> 8)) << 26;
+	// final int low = (nextInt() >>> 8);
+	// return (high | low) * 0x1.0p-52d;
+	// }
+
+	/**
+	 * Returns a 64 bit uniformly distributed random number in the open unit
+	 * interval <code>(0.0,1.0)</code> (excluding 0.0 and 1.0).
+	 * 
+	 * @param inclusive0
+	 * @param inclusive1
+	 * 
+	 * @return
+	 */
+	public double nextDouble(boolean inclusive0, boolean inclusive1) {
+
+		// [0,1]
+		if (inclusive0 && inclusive1) {
+			double randomValue = 0 + (1 - 0) * nextDouble();
+			long l = nextLong();
+			return (l - Long.MIN_VALUE) / (Long.MAX_VALUE - Long.MIN_VALUE);
+		}
+
+		// [0,1)
+		if (inclusive0 && !inclusive1) {
+			return nextDouble();
+		}
+
+		// (0, 1];
+		if (!inclusive0 && inclusive1) {
+			double d = nextDouble();
+			return 1.0 - d;
+		}
+
+		// (0,0)
+		return nextDoubleExcl0Excl1();
+
 	}
 
-	float nextFloat1() {
-		// inspired by org.apache.commons.math.random.BitsStreamGenerator;
-		return (nextInt() >>> 8) * 0x1.0p-23f;
+	public float nextFloat(boolean inclusive0, boolean inclusive1) {
+		if (inclusive0 & inclusive1) {
+			throw new UnsupportedOperationException();
+		} else
+			return nextFloatExcl0Excl1();
+
 	}
 
-	double nextDouble1() {
-		// inspired by org.apache.commons.math.random.BitsStreamGenerator;
-		final long high = ((long) (nextInt() >>> 8)) << 26;
-		final int low = (nextInt() >>> 8);
-		return (high | low) * 0x1.0p-52d;
+	/**
+	 * Returns a 64 bit uniformly distributed random number in the open unit
+	 * interval <code>(0.0,1.0)</code> (excluding 0.0 and 1.0).
+	 */
+	double nextDoubleExcl0Excl1() {
+		double nextDouble;
+
+		do {
+			// -9.223372036854776E18 == (double) Long.MIN_VALUE
+			// 5.421010862427522E-20 == 1 / Math.pow(2,64) == 1 / ((double)
+			// Long.MAX_VALUE - (double) Long.MIN_VALUE);
+			nextDouble = (nextLong() - -9.223372036854776E18) * 5.421010862427522E-20;
+		}
+		// catch loss of precision of long --> double conversion
+		while (!(nextDouble > 0.0 && nextDouble < 1.0));
+
+		// --> in (0.0,1.0)
+		return nextDouble;
+
+		/*
+		 * nextLong == Long.MAX_VALUE --> 1.0 nextLong == Long.MIN_VALUE --> 0.0
+		 * nextLong == Long.MAX_VALUE-1 --> 1.0 nextLong ==
+		 * Long.MAX_VALUE-100000L --> 0.9999999999999946 nextLong ==
+		 * Long.MIN_VALUE+1 --> 0.0 nextLong == Long.MIN_VALUE-100000L -->
+		 * 0.9999999999999946 nextLong == 1L --> 0.5 nextLong == -1L --> 0.5
+		 * nextLong == 2L --> 0.5 nextLong == -2L --> 0.5 nextLong == 2L+100000L
+		 * --> 0.5000000000000054 nextLong == -2L-100000L -->
+		 * 0.49999999999999456
+		 */
+	}
+
+	private float nextFloatExcl0Excl1() {
+
+		/*
+		 * nextInt == Integer.MAX_VALUE --> 0.49999999976716936 nextInt ==
+		 * Integer.MIN_VALUE --> 0.5 nextInt == Integer.MAX_VALUE-1 -->
+		 * 0.4999999995343387 nextInt == Integer.MIN_VALUE+1 -->
+		 * 0.5000000002328306 nextInt == 1 --> 2.3283064365386963E-10 nextInt ==
+		 * -1 --> 0.9999999997671694 nextInt == 2 --> 4.6566128730773926E-10
+		 * nextInt == -2 --> 0.9999999995343387
+		 */
+		// catch loss of precision of double --> float conversion
+		float nextFloat;
+		do {
+			int nextInt;
+			do { // accept anything but zero
+				nextInt = nextInt(); // in
+				// [Integer.MIN_VALUE,Integer.MAX_VALUE]-interval
+			} while (nextInt == 0);
+			// transform to (0.0,1.0)-interval
+			// 2.3283064365386963E-10 == 1.0 / Math.pow(2,32)
+			nextFloat = (float) ((nextInt & 0xFFFFFFFFL) * 2.3283064365386963E-10);
+		} while (nextFloat >= 1.0f);
+		// --> in (0.0f,1.0f)
+		return nextFloat;
+
 	}
 
 	/**
@@ -1064,7 +1198,18 @@ public abstract class Pseudorandomness extends Randomness implements
 	 * 
 	 * @return next substream
 	 */
+	@Deprecated
 	public Pseudorandomness next() {
 		throw new UnsupportedOperationException();
+	}
+
+	public static void main(String[] args) {
+		Pseudorandomness ca = Pseudorandomness.current(PRNG.SFMT);
+		Pseudorandomness ca1 = ca.copy();
+
+		while (!(ca.nextDouble(true, true) == 0.0)) {
+
+		}
+
 	}
 }

@@ -46,8 +46,8 @@ import java.util.zip.DeflaterOutputStream;
  * @author <br>
  *         The {@linkplain TRNG#THREADS_AND_COUNTER threaded entropy} algorithm
  *         is based on an idea of Marcus Lippert.
- * @author <br> {@linkplain #QRBG} service created by Radomir Stevanović (Center for
- *         Informatics and Computing, Ruđer Bošković Institute) and Mario
+ * @author <br> {@linkplain #QRBG} service created by Radomir Stevanović (Center
+ *         for Informatics and Computing, Ruđer Bošković Institute) and Mario
  *         Stipčević (Division of experimental physics, Ruđer Bošković
  *         Institute).
  * @author <br>
@@ -1090,5 +1090,6 @@ public enum TRNG/* implements Generator, Closeable */{
 	public static final int nextTimeEntropy() {
 		return ((int) System.nanoTime()) ^ ((byte) System.currentTimeMillis());
 	}
+
 
 }
