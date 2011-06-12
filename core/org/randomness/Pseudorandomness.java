@@ -819,8 +819,9 @@ public abstract class Pseudorandomness extends Randomness implements
 	}
 
 	/**
-	 * Returns a uniformly distributed random floating point number in the open
-	 * interval <tt>(from,to)</tt> (excluding <tt>from</tt> and <tt>to</tt>).
+	 * Returns a 64 bit uniformly distributed random floating point number in
+	 * the open interval <tt>(from,to)</tt> (excluding <tt>from</tt> and
+	 * <tt>to</tt>).
 	 * 
 	 * @param from
 	 *            low border of interval (excluded)
@@ -843,8 +844,9 @@ public abstract class Pseudorandomness extends Randomness implements
 	}
 
 	/**
-	 * Returns a uniformly distributed random floating point number in the open
-	 * interval <tt>(from,to)</tt> (excluding <tt>from</tt> and <tt>to</tt>).
+	 * Returns a 32 bit uniformly distributed random floating point number in
+	 * the open interval <tt>(from,to)</tt> (excluding <tt>from</tt> and
+	 * <tt>to</tt>).
 	 * 
 	 * @param from
 	 *            low border of interval (excluded)
@@ -1093,19 +1095,53 @@ public abstract class Pseudorandomness extends Randomness implements
 	// }
 
 	/**
-	 * Returns a 64 bit uniformly distributed random number in the open unit
-	 * interval <code>(0.0,1.0)</code> (excluding 0.0 and 1.0).
+	 * Returns a 64 bit uniformly distributed random floating point numberin the
+	 * specified range.
+	 * <p>
+	 * The possible range options include:
+	 * 
+	 * <table border=1 cellpadding=6 cellspacing=1 >
+	 * <tr>
+	 * <th>
+	 * Options
+	 * <th>
+	 * Range
+	 * <tr>
+	 * <td>
+	 * <code>true,	true</code>
+	 * <td>
+	 * <code>[0,1]</code>
+	 * <tr>
+	 * <td>
+	 * <code>true,	false</code>
+	 * 
+	 * <td>
+	 * <code>[0,1)</code>
+	 * <tr>
+	 * <td>
+	 * <code>false,	true</code>
+	 * <td>
+	 * <code>(0,1]</code>
+	 * <tr>
+	 * <td>
+	 * <code>false,	false</code>
+	 * 
+	 * <td>
+	 * <code>(0,1)</code>
+	 * </table>
 	 * 
 	 * @param inclusive0
+	 *            indicate if <code>0</code> is open/closed in range;
+	 *            <code>true</code> if closed, <code>false</code> if open.
 	 * @param inclusive1
-	 * 
-	 * @return
+	 *            indicate if <code>1</code> is open/closed in range;
+	 *            <code>true</code> if closed, <code>false</code> if open.
+	 * @return next
 	 */
 	public double nextDouble(boolean inclusive0, boolean inclusive1) {
 
 		// [0,1]
 		if (inclusive0 && inclusive1) {
-			double randomValue = 0 + (1 - 0) * nextDouble();
 			long l = nextLong();
 			return (l - Long.MIN_VALUE) / (Long.MAX_VALUE - Long.MIN_VALUE);
 		}
@@ -1117,8 +1153,7 @@ public abstract class Pseudorandomness extends Randomness implements
 
 		// (0, 1];
 		if (!inclusive0 && inclusive1) {
-			double d = nextDouble();
-			return 1.0 - d;
+			return 1.0 - nextDouble();
 		}
 
 		// (0,0)
@@ -1126,7 +1161,7 @@ public abstract class Pseudorandomness extends Randomness implements
 
 	}
 
-	public float nextFloat(boolean inclusive0, boolean inclusive1) {
+	float nextFloat(boolean inclusive0, boolean inclusive1) {
 		if (inclusive0 & inclusive1) {
 			throw new UnsupportedOperationException();
 		} else
